@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>index</title>
+<style>
+:root{--bg:#f6f4ee;--card:#fff;--tx:#1d2b24;--mut:#66736c;--pri:#0f6b4a;--bd:#dcd8cc;--ok:#0f6b4a;--wait:#b26a00;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a16;--card:#1b2620;--tx:#eef2ee;--mut:#9aa8a0;--pri:#3fb985;--bd:#2f3d35;--ok:#3fb985;--wait:#e0a040}}
+:root[data-theme="dark"]{--bg:#121a16;--card:#1b2620;--tx:#eef2ee;--mut:#9aa8a0;--pri:#3fb985;--bd:#2f3d35;--ok:#3fb985;--wait:#e0a040}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:8px 0 2px}h2{font-size:1.1rem;margin:0 0 10px}
+.sub{color:var(--mut);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:14px}
+label{display:block;font-weight:600;margin:12px 0 4px;font-size:.92rem}
+input,select{width:100%;box-sizing:border-box;padding:11px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit}
+button{background:var(--pri);color:#fff;border:0;border-radius:10px;padding:12px 16px;font:inherit;font-weight:600;width:100%;margin-top:16px;cursor:pointer}
+button.s{background:transparent;color:var(--pri);border:1px solid var(--pri);width:auto;margin:0;padding:6px 10px;font-size:.85rem}
+.pay{display:flex;gap:10px}.pay div{flex:1;border:1px solid var(--bd);border-radius:10px;padding:10px;text-align:center}
+.pay b{display:block;font-size:1.05rem}
+.msg{padding:10px;border-radius:10px;margin-top:12px;display:none}
+.msg.ok{display:block;background:rgba(15,107,74,.12);color:var(--ok)}.msg.err{display:block;background:rgba(178,60,40,.12);color:#b23c28}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--bd)}
+.row small{color:var(--mut);display:block}
+.tag{font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid currentColor}
+.p{color:var(--ok)}.w{color:var(--wait)}
+.stats{display:flex;gap:10px;margin-bottom:10px}.stats div{flex:1;text-align:center;border:1px solid var(--bd);border-radius:10px;padding:8px}.stats b{display:block;font-size:1.3rem}
+.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>🚌 Caravane Touba → UCAD</h1>
+<p class="sub">Amicales des étudiants et ressortissants de Touba · Départ prévu le 7 novembre, inshallah</p>
+
+<section id="admin" class="card hide">
+  <h2>Tableau de bord du président</h2>
+  <div class="stats"><div><b id="nTot">0</b>inscrits</div><div><b id="nPaid">0</b>payés</div><div><b id="nSum">0</b>F reçus</div></div>
+  <input id="q" placeholder="Rechercher un nom ou numéro">
+  <div id="list"></div>
+</section>
+
+<section class="card">
+  <h2>Inscription et cotisation</h2>
+  <div class="pay">
+    <div>Wave<b id="wv"></b></div>
+    <div>Orange Money<b id="om"></b></div>
+  </div>
+  <p class="sub" style="margin-top:10px">Cotisation : <b id="amt"></b> F. Faites le transfert, puis remplissez le formulaire avec la capture d’écran.</p>
+  <label for="nom">Nom et prénom</label><input id="nom" autocomplete="name">
+  <label for="tel">Téléphone</label><input id="tel" type="tel" autocomplete="tel">
+  <label for="fil">Faculté / UFR / niveau</label><input id="fil" placeholder="ex. FLSH, L2">
+  <label for="op">Payé via</label>
+  <select id="op"><option>Wave</option><option>Orange Money</option></select>
+  <label for="mt">Montant envoyé (F)</label><input id="mt" type="number" inputmode="numeric">
+  <label for="pr">Capture du transfert</label><input id="pr" type="file" accept="image/*">
+  <button id="go">Envoyer mon inscription</button>
+  <div id="msg" class="msg"></div>
+  <p class="sub" id="mailBox" style="display:none;margin-top:12px">Pour prévenir le président par email aussi : <a id="mail" href="#">envoyer un email</a></p>
+</section>
+</main>
+<script>
+// ====== À MODIFIER ======
+const CFG={wave:"77 000 00 00",om:"78 000 00 00",montant:2000,email:"president@exemple.com"};
+// ========================
+const $=id=>document.getElementById(id);
+$("wv").textContent=CFG.wave;$("om").textContent=CFG.om;$("amt").textContent=CFG.montant;$("mt").value=CFG.montant;
+let db=null,assets=null,user=null,all=[];
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function say(t,ok){const m=$("msg");m.textContent=t;m.className="msg "+(ok?"ok":"err")}
+function render(){
+  const f=$("q").value.toLowerCase();
+  $("nTot").textContent=all.length;
+  $("nPaid").textContent=all.filter(x=>x.paye).length;
+  $("nSum").textContent=all.filter(x=>x.paye).reduce((a,x)=>a+(+x.montant||0),0);
+  $("list").innerHTML=all.filter(x=>(x.nom+x.tel).toLowerCase().includes(f)).map(x=>
+    `<div class="row"><div><b>${esc(x.nom)}</b> <span class="tag ${x.paye?"p":"w"}">${x.paye?"Payé":"À vérifier"}</span>
+    <small>${esc(x.tel)} · ${esc(x.fil)} · ${esc(x.op)} ${esc(x.montant)} F</small>
+    ${x.preuve?`<small><a href="/_blob/${esc(x.preuve)}" target="_blank">Voir la capture</a></small>`:""}</div>
+    <button class="s" data-id="${esc(x.id)}">${x.paye?"Annuler":"Valider"}</button></div>`).join("")||"<p class='sub'>Aucune inscription.</p>";
+}
+$("q").oninput=render;
+$("list").onclick=async e=>{const id=e.target.dataset?.id;if(!id)return;const x=all.find(a=>a.id===id);
+  try{await db.collection("inscrits").doc(id).update({paye:!x.paye})}catch(_){}};
+$("go").onclick=async()=>{
+  const nom=$("nom").value.trim(),tel=$("tel").value.trim(),file=$("pr").files[0];
+  if(!nom||!tel||!file)return say("Nom, téléphone et capture sont obligatoires.");
+  if(!db||!assets||!user)return say("Connexion requise pour envoyer l’inscription.");
+  $("go").disabled=true;
+  try{
+    const up=await assets.upload(file);
+    const id=await user.id();
+    await db.collection("inscrits").doc(id).set({nom,tel,fil:$("fil").value.trim(),op:$("op").value,montant:+$("mt").value||0,preuve:up.id,paye:false,ts:Date.now()});
+    say("Inscription envoyée. Le président va vérifier ton transfert. Jazakallah khayr !",true);
+    const body=`Nom: ${nom}\nTél: ${tel}\nFaculté: ${$("fil").value}\nPaiement: ${$("op").value} ${$("mt").value} F`;
+    $("mail").href=`mailto:${CFG.email}?subject=${encodeURIComponent("Caravane UCAD - "+nom)}&body=${encodeURIComponent(body)}`;
+    $("mailBox").style.display="block";
+  }catch(e){say("Échec de l’envoi ("+(e.code||e.message||"erreur")+"). Réessaie.")}
+  $("go").disabled=false;
+};
+(async()=>{
+  try{user=await claude.use("user");db=await claude.use("db");assets=await claude.use("assets")}catch(_){}
+  if(user&&user.canEdit()&&db){
+    $("admin").classList.remove("hide");
+    db.collection("inscrits").orderBy("ts","desc").onSnapshot(s=>{all=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
+  }
+})();
+</script>
+</body>
+</html>
